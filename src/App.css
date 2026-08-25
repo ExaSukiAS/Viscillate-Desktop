@@ -1,0 +1,37 @@
+:root {
+  --color-primary: #4e83ef;
+  --color-primary-light: #80aaff;
+  --color-primary-dark: #283143;
+  --color-secondary: #9872cc;
+  --color-tertiary: #c36990;
+  --color-error: #d82f48;
+  --color-success: #2fd82f;
+  --color-background: #131314;
+  --color-background-light: #292929;
+  --color-background-lighter: #424242;
+  --color-text: #f8f9fa;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  background: radial-gradient(var(--color-background-light) 2px, var(--color-background) 2px);
+  background-size: 100px 100px;
+  overflow: hidden;
+  text-align: left;
+  font-family: "Poppins";
+  margin: 0px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+#graphContainer {
+  width: 60vw;
+  height: 60vh;
+}/*# sourceMappingURL=App.css.map */

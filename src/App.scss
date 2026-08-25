@@ -1,0 +1,70 @@
+$themes: (
+  light: (
+    primary: #2563eb,
+    primary-light: #60a5fa,
+    primary-dark: #1e3a8a,
+    secondary: #7c3aed,
+    tertiary: #b83280,
+    error: #dc2626,
+    success: #16a34a,
+    background: #f7f2ff,
+    background-light: #ffffff,
+    background-lighter: #e2e8f0,
+    text: #0f172a
+  ),
+  dark: (
+    primary: #4e83ef,
+    primary-light: #80aaff,
+    primary-dark: #283143,
+    secondary: #9872cc,
+    tertiary: #c36990,
+    error: #d82f48,
+    success: #2fd82f,
+    background: #131314,
+    background-light: #292929,
+    background-lighter: #424242,
+    text: #f8f9fa
+  )
+);
+
+@mixin generate-theme-vars($palette) {
+  @each $name, $value in $palette {
+    --color-#{$name}: #{$value};
+  }
+}
+
+:root {
+  @include generate-theme-vars(map-get($themes, dark));
+}
+
+// Smooth Theme Transitions Helper
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+@function theme($key) {
+  @return var(--color-#{$key});
+}
+
+$spaceGrotesk: "Space Grotesk";
+$poppins: "Poppins";
+
+body{
+    background: radial-gradient(theme(background-light) 2px, theme(background) 2px);
+    background-size: 100px 100px;
+    overflow: hidden;
+    text-align: left;
+    font-family: $poppins;
+    margin: 0px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#graphContainer{
+    width: 60vw;
+    height: 60vh;
+}
