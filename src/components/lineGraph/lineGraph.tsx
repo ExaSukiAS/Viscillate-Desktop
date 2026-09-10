@@ -3,107 +3,80 @@ import uPlot, { Options } from "uplot";
 import "uplot/dist/uPlot.min.css";
 
 type LineGraphProps = {
-  maxPoints: number;
+  data: { timestamp: number; voltage: number }[];
   maxVolt: number;
   minVolt: number;
-  latestPoint?: { timestamp: number; voltage: number };
   colors: Record<string, string>;
 };
 
 export const LineGraph = ({
-  maxPoints,
+  data,
   maxVolt,
   minVolt,
-  latestPoint,
   colors
 }: LineGraphProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
-  
-  // Store series data in refs so updates don't trigger React re-renders: [xTimestamps[], yVoltages[]]
-  const dataRef = useRef<[number[], number[]]>([[], []]);
 
-  // Initialize uPlot chart instance
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // If CSS collapses the div, fallback to 800x400 so uPlot still renders
+    const width = containerRef.current.clientWidth || 800;
+    const height = containerRef.current.clientHeight || 400;
+
     const opts: Options = {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
+      width,
+      height,
       scales: {
         x: { time: false },
-        y: { auto: false, range: [minVolt, maxVolt] },
+        y: { range: [minVolt, maxVolt] }, // enforce the Y-axis range based on props
       },
       axes: [
         // X Axis
         {
           stroke: colors.text,
-          space: 40, // Prevents label overlapping by giving more space between ticks
-          
-          // Format ticks as elapsed time
+          space: 60,
           values: (self, ticks) => {
-            const startTime = self.data[0][0] ?? 0;
-            
-            return ticks.map((val) => {
-              const elapsedUs = Math.round((val - startTime));
-              return `${elapsedUs.toLocaleString()}`;
-            });
+            return ticks.map((val) => `${(val / 1000).toFixed(0)} ms`);
           },
-          grid: {
-            show: true,
-            stroke: colors['background-light'],
-            width: 1,
-          },
-          ticks: {
-            show: true,
-            stroke: colors.text,
-            width: 1,
-          },
+          grid: { show: true, stroke: colors['background-light'], width: 1 },
+          ticks: { show: true, stroke: colors.text, width: 1 },
         },
         // Y Axis
         {
           stroke: colors.text,
-          grid: {
-            show: true,
-            stroke: colors['background-light'],
-            width: 1,
-          },
-          ticks: {
-            show: true,
-            stroke: colors.text,
-            width: 1,
-          },
+          grid: { show: true, stroke: colors['background-light'], width: 1 },
+          ticks: { show: true, stroke: colors.text, width: 1 },
         },
       ],
       series: [
         {
-          label: "Elapsed Time",
-          // Formats the tooltip / legend value on hover
-          value: (self, rawVal) => {
-            if (rawVal == null) return "Hover for value";
-            const startTime = self.data[0][0] ?? 0;
-            const elapsedUs = Math.round((rawVal - startTime));
-            return `${elapsedUs.toLocaleString()} ms`;
-          },
+          label: "Time",
+          value: (self, rawVal) => (rawVal == null ? "Hover for value" : `${(rawVal / 1000).toFixed(1)} ms`),
         },
         {
           label: "Voltage",
-          stroke: colors.primary,
+          // Fallback to a blue color just in case the CSS variable is empty
+          stroke: colors.primary || "#3b82f6", 
           width: 2,
           value: (self, rawVal) => (rawVal != null ? `${rawVal.toFixed(2)} V` : "Hover for value"),
         },
       ],
     };
-    const chart = new uPlot(opts, dataRef.current, containerRef.current);
+
+    const chart = new uPlot(opts, [[], []], containerRef.current);
     plotRef.current = chart;
 
-    // Handle container resizing
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        chart.setSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
+        // Only resize if dimensions are valid
+        if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+          chart.setSize({
+            width: entry.contentRect.width,
+            height: entry.contentRect.height,
+          });
+        }
       }
     });
 
@@ -114,26 +87,25 @@ export const LineGraph = ({
       chart.destroy();
       plotRef.current = null;
     };
-  }, [minVolt, maxVolt]);
+  }, [minVolt, maxVolt, colors]);
 
-  // Append incoming real-time points using chart.setData()
   useEffect(() => {
-    if (!latestPoint || !plotRef.current) return;
+    if (!plotRef.current || !data || data.length === 0) return;
 
-    const [x, y] = dataRef.current;
+    const len = data.length;
+    
+    // Using standard arrays for foolproof compatibility
+    const x = Array(len);
+    const y = Array(len);
 
-    x.push(latestPoint.timestamp);
-    y.push(latestPoint.voltage);
-
-    // Evict old points if maxPoints capacity is reached
-    if (x.length > maxPoints) {
-      x.shift();
-      y.shift();
+    for (let i = 0; i < len; i++) {
+      // Force perfectly increasing X values to create the smooth oscilloscope layout
+      x[i] = i * 100; 
+      y[i] = data[i].voltage;
     }
 
-    // Direct high-performance update to uPlot canvas (bypasses DOM manipulation)
-    plotRef.current.setData(dataRef.current);
-  }, [latestPoint, maxPoints]);
+    plotRef.current.setData([x, y]);
+  }, [data]);
 
-  return <div ref={containerRef} id="graphContainer"/>;
+  return <div ref={containerRef} id="graphContainer" />;
 };

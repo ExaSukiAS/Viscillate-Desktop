@@ -1,43 +1,91 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LineGraph } from "./components/lineGraph/lineGraph";
-import "./App.css";
+import "./style.css";
+import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
+
+interface SensorData {
+  v: number;
+  timestamp: number; 
+}
+
+interface SerialPayload {
+  frames: SensorData[];
+}
+
+interface GraphPoint {
+  timestamp: number;
+  voltage: number;
+}
 
 export const App = () => {
+  const TIME_WINDOW_MS = 5000; 
+  const MAX_POINTS = TIME_WINDOW_MS * 10;
+
   const styles = getComputedStyle(document.documentElement);
   const colors: Record<string, string> = {};
-  // List of color keys based on SCSS map
   const colorKeys = ['primary','primary-light','primary-dark','secondary','tertiary','error','success','background','background-light','background-lighter','text'];
+  
   colorKeys.forEach((key) => {
-    const varName = `--color-${key}`;
-    const value = styles.getPropertyValue(varName).trim();
-    if (value) {
-      colors[key] = value;
-    }
+    const value = styles.getPropertyValue(`--color-${key}`).trim();
+    if (value) colors[key] = value;
   });
 
-  const [latestPoint, setLatestPoint] = useState<{ timestamp: number; voltage: number }>();
+  const [graphData, setGraphData] = useState<GraphPoint[]>([]);
 
-  // Simulate high-frequency real-time stream (e.g., WebSocket / BLE data stream)
+  const isSerialStarted = useRef(false);
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newPoint = {
-        timestamp: Date.now(),
-        voltage: Math.sin(Date.now() / 500) * 45.0 + (Math.random() - 0.5) * 4,
-      };
+    if (isSerialStarted.current) return;
+    isSerialStarted.current = true;
 
-      setLatestPoint(newPoint);
-    }, 17); // 58Hz Update
+    invoke('start_serial', { portName: "COM6" })
+      .then(() => console.log("React: Successfully asked Rust to open COM6"))
+      .catch((error) => console.error("React: Failed to open COM6:", error));
+  }, []);
 
-    return () => clearInterval(interval);
+  useEffect(() => {
+    let unlisten: UnlistenFn | undefined;
+    let isMounted = true; 
+
+    listen<SerialPayload>('serial-data', (event) => {
+      if (!isMounted) return;
+      
+      
+      if (event.payload.frames.length > 0) {
+        setGraphData(prevData => {
+          const newBatch = event.payload.frames.map(frame => ({
+            timestamp: frame.timestamp,
+            voltage: frame.v
+          }));
+
+          const combinedData = [...prevData, ...newBatch];
+          
+          if (combinedData.length > MAX_POINTS) {
+            return combinedData.slice(combinedData.length - MAX_POINTS);
+          }
+          return combinedData;
+        });
+      }
+    }).then((unlistenFn) => {
+      unlisten = unlistenFn;
+      if (!isMounted) unlisten();
+    });
+
+    return () => {
+      isMounted = false;
+      if (unlisten) unlisten();
+    };
   }, []);
 
   return (
-    <LineGraph 
-      maxPoints={500} 
-      minVolt={-50} 
-      maxVolt={50} 
-      latestPoint={latestPoint} 
-      colors={colors}
-    />
+    <>
+      <LineGraph 
+        data={graphData} 
+        minVolt={-5} 
+        maxVolt={5} 
+        colors={colors}
+      />
+    </>
   );
 };
